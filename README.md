@@ -190,7 +190,7 @@ Exact structure may evolve, but the project is generally organized as:
 ### Prerequisites
 
 - Node.js `v20+`
-- `npm` or `yarn`
+- `pnpm`, `npm`, or `yarn`
 - A laptop that can run a modern browser comfortably.
 - Modern smartphones with WebRTC-capable browsers.
 
@@ -199,13 +199,13 @@ Exact structure may evolve, but the project is generally organized as:
 ```bash
 git clone https://github.com/Purv-Kabaria/LANConsole.git
 cd LANConsole
-npm install
+pnpm install
 ```
 
 ### Development
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Then:
@@ -218,8 +218,8 @@ Then:
 ### Production
 
 ```bash
-npm run build
-npm start
+pnpm build
+pnpm start
 ```
 
 For a real-world LAN party, run the production build on the laptop and mirror the host browser to a TV/projector.
@@ -228,9 +228,9 @@ For a real-world LAN party, run the production build on the laptop and mirror th
 
 ## 📶 Running on a Laptop Hotspot
 
-1. Enable your laptop’s hotspot (e.g. SSID: `LANConsole-Host`).  
+1. Enable your laptop’s hotspot (e.g. SSID: `LANUNO-Host`).  
 2. Connect all phones to this hotspot.  
-3. Start the app (`npm run dev` or `npm start`).  
+3. Start the app (`pnpm dev` or `pnpm start`).  
 4. On the laptop, open `http://localhost:3000/host`.  
 5. On each phone, open `http://<laptop-ip>:3000/controller` (replace with the IP shown in your network settings).
 
@@ -278,263 +278,5 @@ Guidelines:
 
 ## 📜 License
 
-**LANConsole** is released under the **MIT License**.  
+**LANUNO** is released under the **MIT License**.  
 You are free to use, modify, distribute, and commercialize it.
-
-# 🚀 Distributed LAN Console — README
-
-**Project name:** **LANConsole — Distributed LAN UNO (Host Screen + Phone Controllers)**
-
-**Short description:**  
-An ultra-low-latency multiplayer **UNO-style card game** where a laptop acts as the *authoritative host + table display* and players use their phones (browser) as controllers for their private hands. Works fully offline using a laptop hotspot. The host screen shows the discard pile, current color/value, turn order, and game log; each phone shows only that player’s hand and action buttons.
-
-**Primary goals**
-- UNO-style rules (draw, skip, reverse, +2, +4, wild, stacking options)  
-- Support for **2–8 players** connected over LAN  
-- Ultra-low-latency using WebRTC DataChannels + WebSocket fallback  
-- Strong distributed-computing layer (discovery, ordering, fault tolerance, replication)
-
-# 🎮 Features
-
-## Core Gameplay (UNO Variant)
-- Classic UNO deck (0–9, Skip, Reverse, Draw Two, Wild, Wild Draw Four)  
-- Configurable house rules (stacking, 7-0 swaps, jump-ins, starting hand size)  
-- Per-player hands visible only on their phone controllers  
-- Host “table” view showing top discard, current color, turn indicator, and card counts  
-- Turn timer, auto-draw/auto-play options, and quick re-hosting for new rounds
-
-## Host Display
-- Single-table layout optimized for TVs/projectors  
-- Clear top-card and color indicator  
-- Visible player order, whose turn it is, and remaining cards per player  
-- Status banner for actions (e.g., “Player 3 played Draw Two on Player 1”)  
-- Optional minimal info panel for spectators (round, scores, rule set)
-
-## Networking & DC Features
-- **WebRTC DataChannels** (primary, unreliable/unordered)  
-- **WebSocket** fallback + signaling  
-- UDP broadcast / mDNS host discovery  
-- Authoritative host with prediction + reconciliation  
-- Sequenced events with Lamport-style ordering  
-- Heartbeat-based fault tolerance  
-- Optional soft replication to backup host
-
-# 🏗️ System Architecture
-
-## Roles
-**Host (Laptop)**
-- Runs UNO rules, turn order, shuffling, scoring, and authoritative reconciliation  
-- Renders the shared table view (discard pile, color, player summaries)  
-- Runs WebRTC signaling + WebSocket fallback  
-- Broadcasts presence for discovery  
-
-**Controller (Phones)**
-- Sends high-level actions only (play card X, draw, call UNO, choose color)  
-- Shows the player’s hand, possible actions, and a compact action log  
-- Provides ready state, chat/emotes, and settings UI for host-approved house rules  
-
-**Optional Backup Host**
-- Maintains soft-synced state snapshots
-
-## Network Flow
-1. Discovery → UDP/mDNS → Host reply  
-2. Signaling → WebSocket → WebRTC negotiation  
-3. Realtime → DataChannels (unreliable)  
-4. Rendering → Host produces final split-screen image
-
-## Host Split-Screen Responsibilities
-- Render 1–8 viewports  
-- Independent frustum culling per camera  
-- Per-viewport resolution scaling
-
-# 🧰 Tech Stack
-
-## Rendering (3D Engine)
-- **Babylon.js** — recommended (multi-camera, shadows, postprocess pipelines)  
-- **Alternatively:** Three.js for full customization  
-
-## Web Framework
-- **Next.js 15** for host UI + static assets  
-- Controller UI using HTML/JS or tiny React/Preact
-
-## Networking
-- **WebRTC DataChannels** (unreliable, unordered, maxRetransmits=0)  
-- **WebSocket (ws)** for signaling/fallback  
-- **Node.js dgram** for UDP LAN discovery  
-- Optional: `wrtc` for server-side RTCPeerConnection
-
-## Performance Tools
-- WebWorkers for physics or packet parsing  
-- WASM for intensive physics/collision  
-- pm2 for stability  
-- TypeScript for protocol safety
-
-# 🖥️ Split-Screen Rendering Design
-
-## Viewport Layouts (adaptive)
-- **1p:** Fullscreen  
-- **2p:** Horizontal or vertical split  
-- **3–4p:** 2×2 grid  
-- **5–8p:** 4×2 or 2×4 grid  
-
-## Camera Setup (per player)
-- Chase camera (offset + smoothing)  
-- Collision-aware camera  
-- Drift roll + collision shake  
-- HUD per viewport (speed, lap, minimap, nitro)
-
-## Rendering Optimizations
-1. Resolution scaling per viewport  
-2. Lower shadow quality above 2 players  
-3. Frustum culling in each viewport  
-4. GPU instancing for repeated props  
-5. Static mesh merging  
-6. Postprocessing disabled above 4 players  
-7. Dynamic quality adaptation
-
-## Example resolution strategy (1080p)
-- 1p → 1920×1080  
-- 2p → 960×1080  
-- 4p → 960×540  
-- 8p → 480×540  
-
-# ⚡ Networking & Low-Latency Strategy
-
-## Transport
-- WebRTC DataChannels (unreliable) — fastest in browsers  
-- WebSocket fallback (TCP) — reliability when needed
-
-## Tick Strategy
-- **Server (host):** 60Hz physics  
-- **Client inputs:** 30–60Hz  
-- **State updates:** 10–20Hz (delta-compressed)  
-
-## Input Packet (binary)
-- uint8 playerId  
-- int16 steerX  
-- int16 throttle  
-- uint8 actions  
-- uint16 seq  
-- uint32 clientTs  
-
-## Prediction & Reconciliation
-- Phone predicts movement instantly  
-- Host sends corrections  
-- Client smoothly reconciles to avoid snapping  
-
-# 🏎️ Performance Guidelines
-
-## Host Hardware (8 players)
-- Quad-core or better CPU  
-- GTX 1650 / 1660 or equivalent GPU  
-- 8–16GB RAM  
-- SSD
-
-## Engine Practices
-- Avoid GC allocations  
-- Physics in worker or WASM  
-- Chunk/batch network writes  
-- Use OffscreenCanvas (experimental)  
-
-# 🎯 Gameplay Mechanics
-
-## Vehicle Physics
-- Deterministic fixed-step  
-- Forward accel, lateral friction, yaw torque  
-- Drift handled via reduced lateral grip  
-
-## Camera & Controls
-- Chase camera with FOV boost effect  
-- Tilt steering + touch throttle/brake  
-- Per-player HUD elements  
-
-## Collisions
-- Simplified convex bodies  
-- Host-only collision resolution  
-- Camera shake + speed penalties for impacts  
-
-# ⚙️ Installation & Setup
-
-## Prerequisites
-- Node.js v20+  
-- npm/yarn  
-- Laptop with mid-range GPU  
-- Modern phones supporting WebRTC  
-
-## Setup
-```bash
-git clone https://github.com/Purv-Kabaria/LANConsole.git
-cd LANConsole
-npm install
-```
-
-## Development
-```bash
-npm run dev
-```
-
-## Production
-```bash
-npm run build
-npm start
-```
-
-## Running on Laptop Hotspot
-1. Enable laptop hotspot (`LANConsole-Host`)  
-2. Connect phones to hotspot  
-3. Host UI: `http://localhost:3000/host` or `http://<laptop-ip>:3000/host`  
-4. Controllers: `http://<laptop-ip>:3000/controller`  
-
-# 🧪 Testing & Profiling
-
-## Connectivity Tests
-- Test WebRTC RTT for all 1–8 controllers  
-
-## Rendering Tests
-- Test 1/2/4/8 viewport FPS and GPU usage  
-
-## Latency Measurements
-- Input → server  
-- Server tick → render  
-- Render → perception latency (< 70ms ideal)  
-
-# 🤖 Distributed Computing Concepts
-
-## Leader Model
-- Host laptop = authoritative leader  
-- Phones = distributed nodes  
-
-## Discovery
-- UDP broadcast/mDNS  
-
-## Event Ordering
-- Sequence numbers  
-- Dual timestamps  
-- Lamport-style when resolving merges  
-
-## Fault Tolerance
-- Heartbeats every 200ms  
-- Timeout → ghost mode or AI takeover  
-
-## Replication (optional)
-- Snapshot + delta to backup host  
-
-# 🤝 Contributing
-
-## Workflow
-1. Fork  
-2. Branch  
-3. Commit  
-4. Push  
-5. PR  
-
-## Guidelines
-- TypeScript for protocol structures  
-- Maintain binary packet formats  
-- Heavy processing → Worker/WASM  
-
-# 📜 License
-
-**LANConsole**  
-Released under MIT License.  
-Free to use, modify, distribute, and commercialize.

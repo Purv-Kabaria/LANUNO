@@ -78,7 +78,7 @@ export default function Home() {
             </div>
           </motion.div>
 
-          <p className="text-[14px] sm:text-base md:text-xl font-black text-white max-w-lg mx-auto px-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mt-3 sm:mt-4 md:mt-5 relative z-20 text-center leading-tight">
+          <p className="text-[14px] cursor-default sm:text-base md:text-xl font-black text-white max-w-lg mx-auto px-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mt-3 sm:mt-4 md:mt-5 relative z-20 text-center leading-tight">
             Play UNO on one screen. Phones as controllers. Fully offline.
           </p>
         </motion.div>

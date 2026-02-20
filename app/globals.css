@@ -196,3 +196,10 @@
       8px 8px 0 var(--foreground);
   }
 }
+
+* {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+}

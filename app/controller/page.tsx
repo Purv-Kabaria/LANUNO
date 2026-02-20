@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Gamepad2, Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
-export default function ControllerPage() {
+function ControllerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const roomId = (searchParams.get("room") ?? "").toUpperCase();
@@ -72,7 +73,6 @@ export default function ControllerPage() {
     console.log("[Controller] Initiating Leave Sequence");
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "LEAVE", roomId }));
-      // Give a tiny window for packet to leave buffer
       setTimeout(() => {
         if (wsRef.current) wsRef.current.close();
         router.push("/");
@@ -85,7 +85,6 @@ export default function ControllerPage() {
 
   useEffect(() => {
     if (roomId) {
-      // Small delay to ensure playerIdRef is set
       const timer = setTimeout(() => connect(), 100);
       return () => clearTimeout(timer);
     }
@@ -105,24 +104,32 @@ export default function ControllerPage() {
 
   if (!roomId) {
     return (
-      <main className="min-h-screen bg-transparent flex flex-col items-center justify-center p-6 -mt-8">
+      <main className="h-[100dvh] w-full bg-[#E32A26] flex flex-col items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden relative selection:bg-[#ffce07] selection:text-black">
+        {/* --- UNO MATTEL BACKGROUND --- */}
+        <div className="absolute inset-0 pointer-events-none opacity-40 bg-[repeating-linear-gradient(45deg,#b81b17_0,#b81b17_12px,transparent_12px,transparent_24px)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,#ff6b68_0%,transparent_60%)] opacity-40 pointer-events-none mix-blend-screen" />
+        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(0,0,0,0.5)]" />
+
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", damping: 15 }}
+          className="relative z-10 w-full max-w-sm"
         >
-          <Card className="max-w-sm md:max-w-md w-full border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center pb-4">
-            <CardHeader className="bg-destructive text-destructive-foreground border-b-4 border-foreground pb-6">
-              <div className="mx-auto w-16 h-16 bg-white border-4 border-foreground rounded-full flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-4 shrink-0">
-                <WifiOff className="w-8 h-8 text-foreground" />
+          {/* Added isolate and p-0 gap-0 to aggressively clip background bleed */}
+          <Card className="w-full border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white rounded-2xl text-center overflow-hidden p-0 gap-0 isolate">
+            {/* Swapped Black header to UNO Red */}
+            <CardHeader className="bg-[#eb1c24] m-0 text-white border-b-4 border-black pb-6 pt-6 rounded-t-xl">
+              <div className="mx-auto w-16 h-16 bg-[#ffce07] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-xl flex items-center justify-center mb-4 shrink-0 -rotate-3">
+                <WifiOff className="w-8 h-8 text-black" />
               </div>
-              <CardTitle className="text-3xl font-black uppercase">No Room</CardTitle>
+              <CardTitle className="text-3xl sm:text-4xl font-black uppercase text-white tracking-wide">No Room</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <p className="text-foreground/80 font-bold mb-6 text-lg">
+            <CardContent className="pt-6 px-6 pb-6">
+              <p className="text-gray-600 font-bold mb-6 text-lg sm:text-xl">
                 Ask host for access code.
               </p>
-              <Button className="w-full h-14 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none hover:bg-primary uppercase font-black text-lg transition-all cursor-pointer" onClick={() => router.push("/join")}>
+              <Button className="w-full h-14 border-4 border-black bg-[#ffce07] text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none hover:bg-[#ffe047] uppercase font-black tracking-widest text-lg transition-all active:scale-95 cursor-pointer" onClick={() => router.push("/join")}>
                 Try To Join
               </Button>
             </CardContent>
@@ -133,10 +140,12 @@ export default function ControllerPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-6 selection:bg-primary selection:text-white relative overflow-hidden">
-      {/* Decorative bg */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-accent/30 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/30 rounded-full blur-[100px] pointer-events-none" />
+    <main className="h-[100dvh] w-full bg-[#E32A26] flex flex-col items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden relative selection:bg-[#ffce07] selection:text-black">
+
+      {/* --- UNO MATTEL BACKGROUND --- */}
+      <div className="absolute inset-0 pointer-events-none opacity-40 bg-[repeating-linear-gradient(45deg,#b81b17_0,#b81b17_12px,transparent_12px,transparent_24px)]" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,#ff6b68_0%,transparent_60%)] opacity-40 pointer-events-none mix-blend-screen" />
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(0,0,0,0.5)]" />
 
       <motion.div
         className="w-full max-w-sm md:max-w-md relative z-10"
@@ -144,23 +153,41 @@ export default function ControllerPage() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", bounce: 0.5 }}
       >
-        <Card className="border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-card overflow-hidden">
-          <CardHeader className={`border-b-4 border-foreground transition-colors duration-500 ease-in-out ${connected ? 'bg-secondary text-secondary-foreground' : 'bg-destructive text-destructive-foreground'}`}>
-            <CardTitle className="flex items-center justify-between text-2xl font-black uppercase">
-              <div className="flex items-center gap-2">
-                <Gamepad2 className="w-8 h-8" />
-                <span>{name}</span>
+        <div className="absolute -top-6 -right-6 w-16 h-16 bg-[#ffce07] rounded-full border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] -z-10 animate-[bounce_4s_infinite]" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white rounded-full border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] -z-10 animate-[bounce_5s_infinite_reverse]" />
+
+        {/* Isolate and rigid p-0 added to force proper rounded clipping on mobile Safari/Chrome */}
+        <Card className="border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white overflow-hidden rounded-2xl flex flex-col max-h-[90vh] p-0 gap-0 isolate">
+
+          {/* Header toggles strictly between UNO Yellow (Connected) and UNO Red (Disconnected) */}
+          <CardHeader className={`m-0 border-b-4 border-black transition-colors duration-500 ease-in-out py-5 px-6 shrink-0 rounded-t-xl ${connected ? 'bg-[#ffce07] text-black' : 'bg-[#eb1c24] text-white'}`}>
+            <CardTitle className="flex items-center justify-between text-2xl sm:text-3xl font-black uppercase tracking-wide">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center shrink-0 -rotate-3 ${connected ? 'bg-[#eb1c24]' : 'bg-[#ffce07]'}`}>
+                  <Image
+                    src="/title.png"
+                    alt="Player"
+                    width={40}
+                    height={40}
+                    // Using brightness/invert CSS filters to make the PNG white when the background is red
+                    className={`w-8 h-8 object-contain`}
+                  />
+                </div>
+                <span className="truncate max-w-[150px]">{name}</span>
               </div>
+
               <motion.div
-                animate={{ scale: connected ? [1, 1.2, 1] : 1 }}
+                animate={{ scale: connected ? [1, 1.1, 1] : 1 }}
                 transition={{ repeat: connected ? Infinity : 0, duration: 2 }}
+                className={`w-12 h-12 rounded-full border-4 border-black flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0 ${connected ? 'bg-white text-black' : 'bg-white text-[#eb1c24]'}`}
               >
-                {connected ? <Wifi className="w-8 h-8 opacity-90" /> : <WifiOff className="w-8 h-8 opacity-90" />}
+                {connected ? <Wifi className="w-6 h-6 stroke-[3px]" /> : <WifiOff className="w-6 h-6 stroke-[3px]" />}
               </motion.div>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
-            <div className="flex flex-col items-center justify-center p-6 border-4 border-foreground rounded-2xl bg-white shadow-[inset_4px_4px_0px_0px_rgba(0,0,0,0.1)] text-center min-h-[160px]">
+
+          <CardContent className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] custom-scrollbar">
+            <div className="flex flex-col items-center justify-center p-6 sm:p-8 border-4 border-black rounded-2xl bg-white shadow-[inset_4px_4px_0px_0px_rgba(0,0,0,0.1)] text-center min-h-[180px]">
               <AnimatePresence mode="wait">
                 {connected ? (
                   <motion.div
@@ -168,12 +195,13 @@ export default function ControllerPage() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
-                    className="space-y-3"
+                    className="space-y-4"
                   >
-                    <div className="inline-flex items-center justify-center px-4 py-2 border-4 border-foreground rounded-full bg-accent shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-accent-foreground font-black text-xl tracking-widest mb-2">
+                    {/* Swapped Black tag for UNO Red tag */}
+                    <div className="inline-flex items-center justify-center px-6 py-2 border-4 border-black rounded-xl bg-[#eb1c24] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-mono font-black text-2xl tracking-widest mb-2">
                       {roomId}
                     </div>
-                    <p className="font-bold text-lg leading-tight uppercase text-foreground">
+                    <p className="font-black text-xl sm:text-2xl uppercase tracking-wider text-black">
                       Ready & Waiting<br />for Host
                     </p>
                   </motion.div>
@@ -183,10 +211,11 @@ export default function ControllerPage() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
-                    className="space-y-3"
+                    className="space-y-5"
                   >
-                    <div className="w-12 h-12 mx-auto border-4 border-foreground border-r-transparent rounded-full animate-spin text-primary" />
-                    <p className="font-black text-lg uppercase text-muted-foreground animate-pulse">
+                    {/* Spinner changed to UNO Yellow to pop inside the content area */}
+                    <div className="w-14 h-14 mx-auto border-[6px] border-black border-r-transparent rounded-full animate-spin text-[#ffce07]" />
+                    <p className="font-black text-xl sm:text-2xl uppercase tracking-widest text-gray-500 animate-pulse">
                       Reconnecting...
                     </p>
                   </motion.div>
@@ -194,10 +223,10 @@ export default function ControllerPage() {
               </AnimatePresence>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 pt-2">
               {!connected && (
                 <Button
-                  className="w-full h-14 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none hover:bg-accent font-black uppercase text-lg transition-all cursor-pointer"
+                  className="w-full h-14 sm:h-16 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none bg-[#ffce07] hover:bg-[#ffe047] text-black font-black tracking-widest uppercase text-lg sm:text-xl transition-all active:scale-95 cursor-pointer"
                   onClick={connect}
                 >
                   Force Reconnect
@@ -205,7 +234,7 @@ export default function ControllerPage() {
               )}
               <Button
                 variant="outline"
-                className="w-full h-14 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none hover:bg-destructive hover:text-white font-black uppercase text-lg transition-all cursor-pointer"
+                className="w-full h-12 sm:h-14 border-4 border-black bg-white text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none hover:bg-[#eb1c24] hover:text-white font-black tracking-widest uppercase text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
                 onClick={handleLeave}
               >
                 Exit Game
@@ -215,5 +244,17 @@ export default function ControllerPage() {
         </Card>
       </motion.div>
     </main>
+  );
+}
+
+export default function ControllerWrapper() {
+  return (
+    <Suspense fallback={
+      <main className="h-[100dvh] flex items-center justify-center bg-[#E32A26]">
+        <div className="w-16 h-16 border-8 border-black border-t-[#ffce07] rounded-full animate-spin shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" />
+      </main>
+    }>
+      <ControllerContent />
+    </Suspense>
   );
 }

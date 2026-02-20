@@ -8,6 +8,7 @@ import { Copy, RefreshCw, Users, Key, QrCode, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import { LatencyTester } from "@/components/latency-tester";
 
 type Member = { id: string; name: string; role: string };
 
@@ -62,7 +63,7 @@ export default function HostPage() {
             })
           );
         };
-        socket.onmessage = (event) => {
+        socket.addEventListener("message", (event) => {
           const msg = JSON.parse(event.data as string);
           if (msg.type === "JOINED") {
             setConnectionId(msg.connectionId);
@@ -71,8 +72,8 @@ export default function HostPage() {
           if (msg.type === "LOBBY_STATE") {
             setMembers(msg.members || []);
           }
-        };
-        socket.onclose = () => { wsRef.current = null; };
+        });
+        socket.addEventListener("close", () => { wsRef.current = null; });
         wsRef.current = socket;
       } catch (wsErr) {
         console.warn("WebSocket not available yet, but UI will render.");
@@ -212,6 +213,12 @@ export default function HostPage() {
 
                 </CardContent>
               </Card>
+
+              {roomId && joinUrl && (
+                <div className="mt-4 sm:mt-6 shrink-0">
+                  <LatencyTester ws={wsRef.current} connectionId={connectionId} members={members} />
+                </div>
+              )}
             </motion.div>
 
             {/* RIGHT PANEL: LOBBY LIST */}

@@ -76,10 +76,10 @@ app.prepare().then(() => {
           const name = msg.name || (role === "host" ? "Host" : "Player");
           const playerId = msg.playerId;
 
-          const room = roomStore.getRoom(roomId);
+          let room = roomStore.getRoom(roomId);
           if (!room) {
-            send({ type: "ERROR", error: "Room not found" });
-            return;
+            console.log(`[Socket] Auto-recovering missing room ${roomId} in Main Node Process...`);
+            room = roomStore.createRoom(roomId);
           }
           if (role === "host") {
             roomStore.setRoomHost(roomId, connectionId, name);
@@ -104,6 +104,35 @@ app.prepare().then(() => {
             roomStore.removeRoomMember(rid, connectionId);
             broadcastLobbyState(rid);
           }
+        }
+
+        if (msg.type === "PING") {
+          send({ type: "PONG", clientTime: msg.clientTime, serverTime: Date.now() });
+        }
+
+        if (msg.type === "PLAYER_PING") {
+          wss.clients.forEach((client) => {
+            if (client.roomId === roomId && client !== ws && client.readyState === 1) {
+              client.send(JSON.stringify({
+                type: "PLAYER_PING",
+                from: connectionId,
+                clientTime: msg.clientTime
+              }));
+            }
+          });
+        }
+
+        if (msg.type === "PLAYER_PONG") {
+          wss.clients.forEach((client) => {
+            if (client.connectionId === msg.to && client.readyState === 1) {
+              client.send(JSON.stringify({
+                type: "PLAYER_PONG",
+                from: connectionId,
+                clientTime: msg.clientTime,
+                serverTime: Date.now()
+              }));
+            }
+          });
         }
       } catch (e) {
         send({ type: "ERROR", error: e.message || "Invalid message" });

@@ -54,6 +54,15 @@ function ControllerContent() {
       const msg = JSON.parse(e.data as string);
       if (msg.type === "JOINED") setConnected(true);
       if (msg.type === "ERROR") setConnected(false);
+
+      // Respond to Latency Tester pings from Host
+      if (msg.type === "PLAYER_PING" && wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "PLAYER_PONG",
+          to: msg.from,
+          clientTime: msg.clientTime
+        }));
+      }
     };
 
     socket.onclose = () => {

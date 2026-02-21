@@ -34,12 +34,6 @@ function JoinForm() {
     setJoining(true);
     setError(null);
     try {
-      // Allow bypassing the API check so the UI works without a backend running
-      const check = await fetch(`/api/rooms?roomId=${encodeURIComponent(rid)}`).catch(() => null);
-      if (check && !check.ok) {
-        const data = await check.json().catch(() => ({}));
-        throw new Error(data.error || "Room not found");
-      }
       const nameParam = encodeURIComponent((name.trim() || "Player").slice(0, 32));
       router.push(`/controller?room=${rid}&name=${nameParam}`);
     } catch (e) {

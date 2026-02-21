@@ -14,8 +14,12 @@ function ControllerContent() {
   const roomId = (searchParams.get("room") ?? "").toUpperCase();
   const name = decodeURIComponent(searchParams.get("name") || "Player");
   const [connected, setConnected] = useState(false);
+  const [inGame, setInGame] = useState(false);
+  const [hand, setHand] = useState<any[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const playerIdRef = useRef<string | null>(null);
+  const isCancelledRef = useRef<boolean>(false);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize unique identity (Distributed Computing: Unique Node ID)
   useEffect(() => {
@@ -56,23 +60,33 @@ function ControllerContent() {
       if (msg.type === "ERROR") setConnected(false);
 
       // Respond to Latency Tester pings from Host
-      if (msg.type === "PLAYER_PING" && wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
+      if (msg.type === "PLAYER_PING" && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
           type: "PLAYER_PONG",
           to: msg.from,
           clientTime: msg.clientTime
         }));
       }
+
+      // Retrieve Game Started triggers
+      if (msg.type === "GAME_STARTED") {
+        setInGame(true);
+        if (msg.hand) setHand(msg.hand);
+      }
     };
 
     socket.onclose = () => {
-      setConnected(false);
       wsRef.current = null;
+      setConnected(false);
+      if (!isCancelledRef.current) {
+        console.log("Player socket closed. Reconnecting...");
+        reconnectTimerRef.current = setTimeout(connect, 1000);
+      }
     };
 
     socket.onerror = () => {
-      setConnected(false);
       wsRef.current = null;
+      setConnected(false);
     };
 
     wsRef.current = socket;
@@ -80,6 +94,8 @@ function ControllerContent() {
 
   const handleLeave = useCallback(() => {
     console.log("[Controller] Initiating Leave Sequence");
+    isCancelledRef.current = true;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "LEAVE", roomId }));
       setTimeout(() => {
@@ -93,6 +109,7 @@ function ControllerContent() {
   }, [roomId, router]);
 
   useEffect(() => {
+    isCancelledRef.current = false;
     if (roomId) {
       const timer = setTimeout(() => connect(), 100);
       return () => clearTimeout(timer);
@@ -102,11 +119,14 @@ function ControllerContent() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      isCancelledRef.current = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (wsRef.current) {
         if (wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: "LEAVE", roomId }));
         }
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
   }, [roomId]);
@@ -198,7 +218,56 @@ function ControllerContent() {
           <CardContent className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] custom-scrollbar">
             <div className="flex flex-col items-center justify-center p-6 sm:p-8 border-4 border-black rounded-2xl bg-white shadow-[inset_4px_4px_0px_0px_rgba(0,0,0,0.1)] text-center min-h-[180px]">
               <AnimatePresence mode="wait">
-                {connected ? (
+                {inGame ? (
+                  <motion.div
+                    key="ingame"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="w-full h-full flex flex-col"
+                  >
+                    <div className="font-black text-xl uppercase tracking-widest text-[#eb1c24] mb-3">Your Cards</div>
+                    <div className="relative flex justify-center items-center h-[200px] sm:h-[240px] w-full mt-2">
+                      {[...hand].sort((a, b) => {
+                        const colorOrder: Record<string, number> = { "Red": 1, "Blue": 2, "Green": 3, "Yellow": 4, "Wild": 5 };
+                        if (colorOrder[a.color] !== colorOrder[b.color]) {
+                          return (colorOrder[a.color] || 99) - (colorOrder[b.color] || 99);
+                        }
+                        return String(a.value).localeCompare(String(b.value));
+                      }).map((card, idx, arr) => {
+                        const total = arr.length;
+                        const maxSpread = 60; // Max angle difference
+                        const angle = total > 1 ? (idx - (total - 1) / 2) * (maxSpread / (total - 1)) : 0;
+                        const baseOffsetY = 20; // push down baseline slightly
+                        const archY = Math.abs(angle) * 0.5; // arc shape
+                        const yOffset = baseOffsetY + archY;
+                        const xOffset = total > 1 ? (idx - (total - 1) / 2) * 25 : 0;
+
+                        return (
+                          <div
+                            key={card.id || idx}
+                            className="absolute origin-bottom cursor-pointer hover:-translate-y-6 hover:scale-110 hover:z-50 transition-all duration-300 drop-shadow-[4px_4px_0_rgba(0,0,0,1)] hover:drop-shadow-[6px_6px_0_rgba(0,0,0,0.6)]"
+                            style={{
+                              transform: `translateX(${xOffset}px) translateY(${yOffset}px) rotate(${angle}deg)`,
+                              zIndex: idx,
+                            }}
+                          >
+                            {/* ADDED: rounded-[6px] sm:rounded-[8px] and overflow-hidden to clip the corners */}
+                            <div className="w-[72px] sm:w-[88px] aspect-[2/3] relative flex items-center justify-center pointer-events-none rounded-[6px] sm:rounded-[8px] overflow-hidden bg-white">
+                              {/* CHANGED: object-contain to object-fill to ensure the image hits the clipped edges */}
+                              <Image
+                                src={`/cards/${card.image}`}
+                                alt={`${card.color} ${card.value}`}
+                                fill
+                                className="object-fill"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                ) : connected ? (
                   <motion.div
                     key="connected"
                     initial={{ scale: 0.8, opacity: 0 }}

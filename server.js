@@ -11,6 +11,7 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 const roomStore = require("./lib/rooms-store.js");
+const unoLogic = require("./lib/uno-logic.js");
 
 // Distributed Computing: Spawn a background worker thread for room auditing and maintenance
 const roomWorker = new Worker(path.join(__dirname, "lib", "room-worker.js"));
@@ -104,6 +105,48 @@ app.prepare().then(() => {
             roomStore.removeRoomMember(rid, connectionId);
             broadcastLobbyState(rid);
           }
+        }
+
+        if (msg.type === "START_GAME") {
+          console.log(`[Socket] Host started game for room: ${roomId}`);
+          let room = roomStore.getRoom(roomId);
+          if (room) {
+            unoLogic.initializeGame(room);
+            const gameState = room.gameState;
+
+            wss.clients.forEach((client) => {
+              if (client.roomId === roomId && client.readyState === 1) {
+                if (client.role === 'host') {
+                  const playersData = Array.from(room.members.values()).filter(m => m.role !== 'host').map(p => ({ id: p.id, name: p.name, cardsCount: p.cardsCount }));
+                  client.send(JSON.stringify({
+                    type: "GAME_STARTED",
+                    roomId,
+                    topCard: gameState.topCard,
+                    playersData
+                  }));
+                } else {
+                  const p = room.members.get(client.connectionId);
+                  client.send(JSON.stringify({
+                    type: "GAME_STARTED",
+                    roomId,
+                    hand: p ? p.hand : []
+                  }));
+                }
+              }
+            });
+          }
+        }
+
+        if (msg.type === "PLAYER_ACTION") {
+          wss.clients.forEach((client) => {
+            if (client.roomId === roomId && client.role === "host" && client.readyState === 1) {
+              client.send(JSON.stringify({
+                type: "PLAYER_ACTION",
+                connectionId: connectionId,
+                action: msg.action
+              }));
+            }
+          });
         }
 
         if (msg.type === "PING") {

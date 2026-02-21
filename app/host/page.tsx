@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, RefreshCw, Users, Key, QrCode, ArrowLeft } from "lucide-react";
+import { Copy, RefreshCw, Users, Key, QrCode, ArrowLeft, Play } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { LatencyTester } from "@/components/latency-tester";
@@ -20,18 +21,27 @@ export default function HostPage() {
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const router = useRouter();
+
+  const startGame = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "START_GAME", roomId }));
+    }
+  };
 
   const createRoom = useCallback(async () => {
     setLoading(true);
     setError(null);
+    let isCancelled = false;
+    let reconnectTimer: NodeJS.Timeout | undefined;
+
     try {
-      // Attempt to hit your backend API
       const res = await fetch("/api/rooms", { method: "POST" }).catch(() => null);
 
       let rid = "";
       let url = "";
 
-      // Smart Fallback: If API fails/doesn't exist yet, mock it so the UI still works!
       if (!res || !res.ok) {
         rid = Math.random().toString(36).substring(2, 8).toUpperCase();
         url = `${window.location.origin}/join?room=${rid}`;
@@ -47,53 +57,84 @@ export default function HostPage() {
       setRoomId(rid);
       setJoinUrl(url);
 
-      // Attempt WebSocket connection (Silent catch if no backend socket exists yet)
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
-        const socket = new WebSocket(wsUrl);
-        socket.onopen = () => {
-          socket.send(
-            JSON.stringify({
-              type: "JOIN",
-              roomId: rid,
-              role: "host",
-              name: "Host",
-              connectionId: `host_${rid}_${Date.now()}`,
-            })
-          );
-        };
-        socket.addEventListener("message", (event) => {
-          const msg = JSON.parse(event.data as string);
-          if (msg.type === "JOINED") {
-            setConnectionId(msg.connectionId);
-            setMembers(msg.members || []);
-          }
-          if (msg.type === "LOBBY_STATE") {
-            setMembers(msg.members || []);
-          }
-        });
-        socket.addEventListener("close", () => { wsRef.current = null; });
-        wsRef.current = socket;
-      } catch (wsErr) {
-        console.warn("WebSocket not available yet, but UI will render.");
-      }
+      // Now establish HOST socket connection
+      const connectHost = () => {
+        if (isCancelled) return;
+        try {
+          const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          const wsUrl = `${protocol}//${window.location.host}/ws`;
+          const socket = new WebSocket(wsUrl);
+          socket.onopen = () => {
+            if (isCancelled) {
+              socket.close();
+              return;
+            }
+            setConnected(true);
+            socket.send(
+              JSON.stringify({
+                type: "JOIN",
+                roomId: rid,
+                role: "host",
+                name: "Host",
+                connectionId: `host_${rid}_${Date.now()}`,
+              })
+            );
+          };
+          socket.addEventListener("message", (event) => {
+            const msg = JSON.parse(event.data as string);
+            if (msg.type === "JOINED") {
+              setConnectionId(msg.connectionId);
+              setMembers(msg.members || []);
+            }
+            if (msg.type === "LOBBY_STATE") {
+              setMembers(msg.members || []);
+            }
+            if (msg.type === "GAME_STARTED") {
+              router.push(`/play?room=${rid}&role=host`);
+            }
+          });
+          socket.addEventListener("close", () => {
+            wsRef.current = null;
+            setConnected(false);
+            if (!isCancelled) {
+              console.log("Host WebSocket disconnected. Retrying...");
+              reconnectTimer = setTimeout(connectHost, 1000);
+            }
+          });
+          wsRef.current = socket;
+        } catch (wsErr) {
+          console.warn("WebSocket not available yet, but UI will render.");
+        }
+      };
 
+      connectHost();
+
+      return () => {
+        isCancelled = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+      };
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create room");
+      return () => {
+        isCancelled = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+      };
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const cleanup = createRoom();
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      // Just in case createRoom is an async function, we do standard cleanup
+      cleanup.then(fn => fn && fn()); // Execute the cleanup function returned by createRoom
     };
-  }, []);
+  }, [createRoom]);
 
   const copyRoomId = () => {
     if (roomId) {
@@ -192,6 +233,10 @@ export default function HostPage() {
 
                   {/* Room ID & Link */}
                   <div className="shrink-0 w-full space-y-3 sm:space-y-4 flex flex-col justify-center">
+                    <div className="bg-white text-black px-4 py-2 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-full font-black flex items-center gap-2 uppercase tracking-widest cursor-default">
+                      {!connected && <Users className="w-5 h-5 text-[#eb1c24] animate-pulse" />}
+                      {connected ? "Host Panel" : "Reconnecting..."}
+                    </div>
                     <div className="bg-white text-black px-3 py-2 sm:px-6 sm:py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center">
                       <span className="text-xs sm:text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
                         <Key className="w-3 h-3 sm:w-4 sm:h-4 text-[#ffce07]" /> Room Code
@@ -266,6 +311,18 @@ export default function HostPage() {
                     </ul>
                   )}
                 </CardContent>
+
+                {/* START GAME BUTTON for Host */}
+                <div className="p-4 sm:p-5 border-t-4 border-black bg-white shrink-0">
+                  <Button
+                    size="lg"
+                    onClick={startGame}
+                    disabled={members.filter(m => m.role !== "host").length === 0}
+                    className="w-full text-lg sm:text-xl h-14 sm:h-16 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none bg-[#eb1c24] hover:bg-[#eb1c24] text-black transition-all font-black uppercase tracking-widest relative overflow-hidden active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group flex gap-2 items-center justify-center"
+                  >
+                    <Play className="w-6 h-6 fill-black" /> Start Game
+                  </Button>
+                </div>
               </Card>
             </motion.div>
 

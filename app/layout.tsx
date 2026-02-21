@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LAN UNO",
   description: "LAN UNO is a multiplayer UNO game that can be played on a local network.",
+  icons: {
+    icon: "/title.png"
+  }
 };
 
 export const cabin = Cabin({
